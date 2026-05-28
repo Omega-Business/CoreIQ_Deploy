@@ -514,16 +514,14 @@ The Qdrant key used during initial deployment is a broad bootstrap key. Once the
   ```
   - Terraform will not overwrite this on future applies
 
-- [ ] **Restart the container to pick up the new key**
+- [ ] **Force a new revision to pick up the updated Key Vault secret**
   ```bash
-  az containerapp revision restart \
+  az containerapp update \
     --resource-group coreiq-{client_id} \
     --name coreiq-{client_id} \
-    --revision $(az containerapp revision list \
-      --resource-group coreiq-{client_id} \
-      --name coreiq-{client_id} \
-      --query "[0].name" -o tsv)
+    --revision-suffix "v2"
   ```
+  > A revision *restart* does not reliably reload Key Vault secrets — creating a new revision guarantees the latest secret values are fetched on startup.
 
 ### Enable Teams Bot (Optional — when ready)
 
@@ -613,7 +611,7 @@ The Qdrant key used during initial deployment is a broad bootstrap key. Once the
   - BACKEND_URL not set or invalid → Check terraform.tfvars
   - FOUNDRY_ENDPOINT unreachable → Confirm AI Foundry deployed
   - BACKEND_API_KEY rejected → Verify key with CoreIQ team
-- [ ] Restart container: `az containerapp up --resource-group coreiq-{client_id} --name coreiq-{client_id}`
+- [ ] Force a new revision: `az containerapp update --resource-group coreiq-{client_id} --name coreiq-{client_id} --revision-suffix "v2"`
 
 ### 401 Unauthorized to Backend
 
@@ -624,7 +622,7 @@ The Qdrant key used during initial deployment is a broad bootstrap key. Once the
   ```bash
   az keyvault secret show \
     --vault-name ciq-{client_id}-kv \
-    --name backend-api-key \
+    --name coreiq-api-key \
     --query value
   ```
 - [ ] Confirm key matches what CoreIQ provided
@@ -633,7 +631,7 @@ The Qdrant key used during initial deployment is a broad bootstrap key. Once the
   ```bash
   az keyvault secret set \
     --vault-name ciq-{client_id}-kv \
-    --name backend-api-key \
+    --name coreiq-api-key \
     --value "new-key-here"
   ```
 
