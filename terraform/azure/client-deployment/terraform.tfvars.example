@@ -1,0 +1,133 @@
+# ============================================================================
+# CoreIQ Azure Client Deployment Configuration
+# ============================================================================
+# This file defines the variables needed for deploying a CoreIQ forward
+# container to Azure with AI Foundry integration.
+#
+# Three sections below:
+#   1. REQUIRED: You MUST provide values for your deployment
+#   2. PROVIDED_BY_COREIQ: Pre-filled by CoreIQ team (do not change)
+#   3. OPTIONAL: Safe to customize for your environment
+
+# ============================================================================
+# SECTION 1: REQUIRED — Values You Must Provide
+# ============================================================================
+
+# Unique identifier for your client organization
+# Examples: "acme", "demo", "contoso"
+# Used in resource naming: coreiq-{client_id}-container-app
+client_id = "your-client-id-here"
+
+# Azure subscription ID where resources will be deployed
+# Format: UUID (e.g., "12345678-1234-1234-1234-123456789012")
+# Run `az account show` to find your subscription ID
+azure_subscription_id = ""
+
+# Azure tenant ID (Active Directory tenant)
+# Format: UUID
+# Run `az account show` and copy the tenantId
+azure_tenant_id = ""
+
+# Azure region where resources will be deployed
+# Examples: "eastus", "westeurope", "uksouth"
+# Note: Must have AI Foundry capacity for gpt-5.4-nano model
+location = "eastus"
+
+# Azure resource group name for organizing all deployed resources
+# Example: "coreiq-acme" or "acme-production-rg"
+# Must already exist — Terraform will not create it (see checklist Phase 2)
+resource_group_name = "coreiq-{client_id}"
+
+# GitHub Container Registry (GHCR) token for pulling the container image
+# Create a GitHub Personal Access Token with 'packages:read' scope
+# Required only if the image repository is private
+ghcr_token = ""
+
+# ============================================================================
+# SECTION 2: PROVIDED_BY_COREIQ — Do Not Change
+# ============================================================================
+
+# CoreIQ backend API key — leave empty. CoreIQ will push this directly to your Key Vault
+# after deployment. You never need to handle this value.
+# Only set this if CoreIQ instructs you to (e.g. for emergency re-provisioning).
+backend_api_key = ""
+
+# DO backend URL for complex query processing and authentication
+# This is the CoreIQ backend endpoint — all login, embeddings, and escalated queries route here
+do_backend_url = "https://coreiq.omegabusiness.us/backend"
+
+# Container image from GitHub Container Registry
+# Format: ghcr.io/{owner}/{repo}:{tag}
+# Example: ghcr.io/marcusatomega/coreiq-client:latest
+ghcr_image = "ghcr.io/omega-business/coreiq-client:latest"
+
+# ============================================================================
+# SECTION 3: OPTIONAL — Customize for Your Environment
+# ============================================================================
+
+# Azure AI Foundry SKU tier for deployment
+# Options: "S0" (default), "S1", "S2" — S0 is suitable for most deployments
+# Higher SKUs provide more capacity and concurrent requests
+foundry_sku = "S0"
+
+# Foundry model to deploy for local query routing
+# OpenAI models:    foundry_model = "gpt-5.4-nano"  foundry_model_format = "OpenAI"  foundry_model_version = "2025-04-14"
+# Microsoft Phi:    foundry_model = "Phi-3.5-mini-instruct"  foundry_model_format = "Microsoft"  foundry_model_version = "2"
+foundry_model         = "gpt-5.4-nano"
+foundry_model_version = "2025-04-14"
+foundry_model_format  = "OpenAI"
+
+# Qdrant cluster URL (provided by CoreIQ)
+qdrant_url = "https://<cluster-id>.us-east4-0.gcp.cloud.qdrant.io"
+
+# Qdrant API key — leave empty. CoreIQ pushes it directly to Key Vault post-deploy,
+# scoped to your collection(s) once they exist. Never needs to appear in this file.
+# qdrant_api_key = ""
+
+# Workload profile — Dedicated environment for Key Vault secret references
+# D4 = 4 vCPU / 8 GB (minimum dedicated). Options: D4, D8, D16, E4, E8, E16
+workload_profile_type      = "D4"
+workload_profile_min_count = 1
+workload_profile_max_count = 3
+
+# Azure Entra ID (Azure AD) application client ID for SSO
+# Optional: Leave empty ("") to skip SSO configuration
+# If provided, users can authenticate via your organization's Entra ID
+entra_app_client_id = ""
+
+# Azure Entra ID application client secret for SSO
+# Optional: Leave empty ("") to skip SSO configuration
+# Must be paired with entra_app_client_id
+# Treat as sensitive as a password
+entra_app_client_secret = ""
+
+# Object ID of CoreIQ's service principal in YOUR Azure tenant.
+# Step 1 — consent the CoreIQ app (one-time per tenant):
+#   az ad sp create --id <coreiq-app-id>
+# Step 2 — get the object ID:
+#   az ad sp show --id <coreiq-app-id> --query id -o tsv
+# Paste the output here. CoreIQ's App ID will be provided during onboarding.
+coreiq_sp_object_id = ""
+
+# DNS management — set to true once omegabusiness.us is migrated to DigitalOcean
+# Until then, add CNAME manually in Wix: {client_id}.coreiq → {container_app_fqdn}
+dns_managed_by_do = false
+
+# Azure AD app registration for Teams bot (optional)
+# Create at: https://portal.azure.com → Azure Active Directory → App registrations → New registration
+# Set redirect URI to: https://token.botframework.com/.auth/web/redirect
+# After registration, create a client secret under "Certificates & secrets"
+# Set microsoft_app_type based on your registration: "MultiTenant" or "SingleTenant"
+# Leave both ID and password empty ("") to deploy without Teams bot
+microsoft_app_id       = ""
+microsoft_app_password = ""
+microsoft_app_type     = "MultiTenant"
+
+# Secret key for signing browser session cookies in the forward container.
+# Generate with: openssl rand -hex 32
+# If left empty, a random key is generated per restart (sessions lost on restart).
+session_secret = ""
+
+# ============================================================================
+# End of Configuration
+# ============================================================================

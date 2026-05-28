@@ -1,0 +1,71 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "1.0.0",
+  "id": "${MICROSOFT_APP_ID}",
+  "developer": {
+    "name": "CoreIQ",
+    "websiteUrl": "https://${DOMAIN}",
+    "privacyUrl": "https://${DOMAIN}/privacy",
+    "termsOfUseUrl": "https://${DOMAIN}/terms"
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "name": {
+    "short": "CoreIQ",
+    "full": "CoreIQ AI Assistant"
+  },
+  "description": {
+    "short": "AI-powered knowledge assistant",
+    "full": "Access your organization's AI experts directly in Microsoft Teams. Select a persona and get instant answers grounded in your organization's knowledge base."
+  },
+  "accentColor": "#00E5C5",
+  "bots": [
+    {
+      "botId": "${MICROSOFT_APP_ID}",
+      "scopes": ["personal", "team", "groupchat"],
+      "supportsFiles": false,
+      "isNotificationOnly": false,
+      "commandLists": [
+        {
+          "scopes": ["personal", "team", "groupchat"],
+          "commands": [
+            {
+              "title": "Help",
+              "description": "Show available commands"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "configurableTabs": [
+    {
+      "configurationUrl": "https://${DOMAIN}/teams-tab/config",
+      "canUpdateConfiguration": true,
+      "scopes": ["team", "groupchat"]
+    }
+  ],
+  "staticTabs": [
+    {
+      "entityId": "coreiq-personas",
+      "name": "CoreIQ",
+      "contentUrl": "https://${DOMAIN}/teams-tab/",
+      "websiteUrl": "https://${DOMAIN}/teams-tab/",
+      "scopes": ["personal"]
+    }
+  ],
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "validDomains": [
+    "${DOMAIN}"
+  ],
+  "webApplicationInfo": {
+    "id": "${MICROSOFT_APP_ID}",
+    "resource": "https://api.botframework.com"
+  }
+}

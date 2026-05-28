@@ -1,0 +1,14 @@
+# Terraform — never commit real credentials
+terraform/azure/client-deployment/terraform.tfvars
+terraform/azure/client-deployment/.terraform/
+terraform/azure/client-deployment/.terraform.lock.hcl
+terraform/azure/client-deployment/terraform.tfstate
+terraform/azure/client-deployment/terraform.tfstate.backup
+*.tfplan
+
+# Python
+__pycache__/
+*.pyc
+
+# Generated outputs
+coreiq-teams-*.zip
