@@ -16,13 +16,13 @@
   - Command to verify: `az account show`
 
 - [ ] **Azure CLI Installed and Authenticated**
-  - Version 2.50+: `az --version`
+  - Version 2.60+: `az --version`
   - If not installed: [Install Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)
   - Authenticate: `az login`
   - Select subscription: `az account set --subscription <subscription-id>`
 
 - [ ] **Terraform Installed**
-  - Version 1.0+: `terraform version`
+  - Version 1.3+: `terraform version`
   - If not installed: [Install Terraform](https://www.terraform.io/downloads)
 
 - [ ] **Terraform Script Available**
@@ -41,9 +41,13 @@
   - Email: [CoreIQ contact]
   - Information to provide:
     - Client ID: `{client_id}` (decided above)
-    - Contact email for support
-  - CoreIQ will send your **backend API key** via a secure one-time link after deployment.
-    You will paste it into your Key Vault using the `az keyvault secret set` command in Phase 3.
+    - Display name for your organization (e.g. "Acme Corp")
+    - Initial admin username (e.g. `admin` or a real name)
+    - Initial admin email address
+    - Azure region you will deploy to
+  - CoreIQ will provision your backend resources and send you:
+    - **Backend API key** via secure one-time link (pushed to your Key Vault post-deploy)
+    - **Admin portal credentials** via secure one-time link (temporary password, change on first login)
 
 - [ ] **Choose Azure Region**
   - Must support both:
