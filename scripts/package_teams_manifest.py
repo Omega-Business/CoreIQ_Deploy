@@ -44,7 +44,8 @@ def main() -> None:
     args = parse_args()
 
     app_id: str = args.app_id
-    domain: str = args.domain
+    # Strip protocol prefix so both "https://example.com" and "example.com" work
+    domain: str = args.domain.removeprefix("https://").removeprefix("http://").rstrip("/")
 
     output_path = pathlib.Path(
         args.output if args.output else f"coreiq-teams-{domain}.zip"

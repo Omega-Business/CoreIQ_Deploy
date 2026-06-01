@@ -1,8 +1,9 @@
 # terraform/azure/client-deployment/main.tf
 terraform {
+  required_version = ">= 1.3"
   required_providers {
     azurerm = { source = "hashicorp/azurerm", version = "~> 3.48" }
-    azapi   = { source = "azure/azapi", version = "~> 1.0" }
+    azapi   = { source = "azure/azapi", version = "~> 2.0" }
     digitalocean = { source = "digitalocean/digitalocean", version = "~> 2.0" }
   }
 }
@@ -30,6 +31,14 @@ locals {
   safe_client_id = lower(replace(var.client_id, "_", "-"))
   kv_name        = "ciq-${substr(local.safe_client_id, 0, min(length(local.safe_client_id), 14))}-kv"
   bot_enabled    = var.microsoft_app_id != "" && var.microsoft_app_password != ""
+
+  # Stable ingress FQDN — strips the revision suffix (--xxxxxxx) so the bot
+  # messaging endpoint doesn't break when a new revision is deployed.
+  container_app_stable_fqdn = replace(
+    azurerm_container_app.app.latest_revision_fqdn,
+    "/--[^.]+\\./",
+    "."
+  )
 }
 
 # Key Vault — stores BACKEND_API_KEY and Entra creds
@@ -52,26 +61,9 @@ resource "azurerm_key_vault_access_policy" "deployer" {
 
 resource "azurerm_key_vault_secret" "api_key" {
   name         = "coreiq-api-key"
-  value        = var.backend_api_key != "" ? var.backend_api_key : "bootstrap-pending"
+  value        = var.backend_api_key
   key_vault_id = azurerm_key_vault.kv.id
   depends_on   = [azurerm_key_vault_access_policy.deployer]
-
-  # CoreIQ pushes the real key post-deploy via the coreiq_push access policy.
-  # Ignore value drift so future terraform applies don't overwrite it.
-  lifecycle {
-    ignore_changes = [value]
-  }
-}
-
-# CoreIQ push access — grants CoreIQ's multi-tenant SP permission to set/get
-# the backend API key for zero-touch key delivery and rotation.
-resource "azurerm_key_vault_access_policy" "coreiq_push" {
-  count        = var.coreiq_sp_object_id != "" ? 1 : 0
-  key_vault_id = azurerm_key_vault.kv.id
-  tenant_id    = var.azure_tenant_id
-  object_id    = var.coreiq_sp_object_id
-
-  secret_permissions = ["Get", "Set"]
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -93,11 +85,12 @@ resource "azurerm_cognitive_account" "ai_foundry" {
 }
 
 resource "azapi_resource" "foundry_model_deployment" {
-  type      = "Microsoft.CognitiveServices/accounts/deployments@2023-05-01"
+  count     = var.skip_model_deployment ? 0 : 1
+  type      = "Microsoft.CognitiveServices/accounts/deployments@2024-06-01-preview"
   name      = var.foundry_model
   parent_id = azurerm_cognitive_account.ai_foundry.id
 
-  body = jsonencode({
+  body = {
     properties = {
       model = {
         format  = var.foundry_model_format
@@ -106,10 +99,10 @@ resource "azapi_resource" "foundry_model_deployment" {
       }
     }
     sku = {
-      name     = "Standard"
+      name     = "GlobalStandard"
       capacity = 10
     }
-  })
+  }
 
   depends_on = [azurerm_cognitive_account.ai_foundry]
 }
@@ -128,15 +121,9 @@ resource "azurerm_key_vault_secret" "foundry_api_key" {
 
 resource "azurerm_key_vault_secret" "qdrant_api_key" {
   name         = "qdrant-api-key"
-  value        = var.qdrant_api_key != "" ? var.qdrant_api_key : "bootstrap-pending"
+  value        = var.qdrant_api_key
   key_vault_id = azurerm_key_vault.kv.id
   depends_on   = [azurerm_key_vault_access_policy.deployer]
-
-  # CoreIQ pushes the real scoped key post-deploy once client collections exist.
-  # ignore_changes prevents terraform apply from overwriting it.
-  lifecycle {
-    ignore_changes = [value]
-  }
 }
 
 resource "azurerm_key_vault_secret" "session_secret" {
@@ -362,7 +349,7 @@ resource "azurerm_bot_service_azure_bot" "teams_bot" {
   microsoft_app_type      = var.microsoft_app_type
   microsoft_app_tenant_id = var.azure_tenant_id
   sku                     = "S1"
-  endpoint            = "https://${azurerm_container_app.app.latest_revision_fqdn}/teams/messages"
+  endpoint            = "https://${local.container_app_stable_fqdn}/teams/messages"
 
   tags = {
     Project   = "CoreIQ"

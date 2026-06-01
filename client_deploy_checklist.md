@@ -56,6 +56,13 @@
   - Recommended regions: `eastus`, `westeurope`, `uksouth`
   - Confirm availability: Contact Azure support or check [AI Foundry regions](https://learn.microsoft.com/en-us/azure/ai-foundry/concepts/regional-support)
 
+- [ ] **Confirm AI Foundry model quota** ⚠️ Do this before running Terraform
+  - New Azure subscriptions have zero quota allocated by default — Terraform will fail at the model deployment step if quota is not in place
+  - Check current quota: Azure Portal → Subscriptions → your subscription → Usage + quotas → search "gpt-5.4-nano"
+  - **If quota shows 0:** Request an increase before running `terraform apply`. Approvals typically take 1-2 business days. You can proceed with all other Terraform steps in the meantime — only the model deployment will fail.
+  - **If quota is already allocated:** No action needed, proceed normally.
+  - Existing subscriptions with prior Azure OpenAI usage almost always have quota already — this check is primarily for brand-new subscriptions.
+
 - [ ] **Decide Environment Name** (optional)
   - Default: `production`
   - Options: `dev`, `staging`, `production`

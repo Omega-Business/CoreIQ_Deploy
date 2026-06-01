@@ -3,12 +3,12 @@
 
 output "container_app_fqdn" {
   description = "Fully qualified domain name of the deployed Container App"
-  value       = azurerm_container_app.app.latest_revision_fqdn
+  value       = local.container_app_stable_fqdn
 }
 
 output "container_app_url" {
   description = "HTTPS URL of the deployed Container App for accessing the forward container"
-  value       = "https://${azurerm_container_app.app.latest_revision_fqdn}"
+  value       = "https://${local.container_app_stable_fqdn}"
 }
 
 output "ai_foundry_endpoint" {
@@ -61,7 +61,7 @@ output "deployment_summary" {
   value = {
     client_id              = var.client_id
     region                 = data.azurerm_resource_group.rg.location
-    container_url          = "https://${azurerm_container_app.app.latest_revision_fqdn}"
+    container_url          = "https://${local.container_app_stable_fqdn}"
     foundry_endpoint       = azurerm_cognitive_account.ai_foundry.endpoint
     foundry_region         = azurerm_cognitive_account.ai_foundry.location
     foundry_model_deployed = var.foundry_model
@@ -77,10 +77,10 @@ output "next_steps" {
 
     IMMEDIATE TESTING:
     1. Container health check:
-       curl -I https://${azurerm_container_app.app.latest_revision_fqdn}/healthz
+       curl -I https://${local.container_app_stable_fqdn}/healthz
 
     2. Container API endpoint:
-       https://${azurerm_container_app.app.latest_revision_fqdn}
+       https://${local.container_app_stable_fqdn}
 
     AI FOUNDRY INTEGRATION:
     - Endpoint: ${azurerm_cognitive_account.ai_foundry.endpoint}
@@ -137,13 +137,13 @@ output "teams_bot_name" {
 
 output "teams_bot_messaging_endpoint" {
   description = "Bot Framework messaging endpoint — configure this in Azure Bot Service and Teams manifest"
-  value       = nonsensitive(local.bot_enabled ? "https://${azurerm_container_app.app.latest_revision_fqdn}/teams/messages" : "")
+  value       = nonsensitive(local.bot_enabled ? "https://${local.container_app_stable_fqdn}/teams/messages" : "")
 }
 
 output "teams_manifest_instructions" {
   description = "Steps to complete Teams bot deployment after terraform apply"
   value = nonsensitive(local.bot_enabled ? (
-    "TEAMS BOT DEPLOYMENT (manual steps after terraform apply):\n1. Run the manifest packaging script:\n   python scripts/package_teams_manifest.py \\\n     --app-id ${var.microsoft_app_id} \\\n     --domain ${azurerm_container_app.app.latest_revision_fqdn}\n2. Upload the generated ZIP to Teams Admin Center:\n   https://admin.teams.microsoft.com -> Teams apps -> Manage apps -> Upload\n3. Assign the app to users or teams as needed.\n"
+    "TEAMS BOT DEPLOYMENT (manual steps after terraform apply):\n1. Run the manifest packaging script:\n   python scripts/package_teams_manifest.py \\\n     --app-id ${var.microsoft_app_id} \\\n     --domain ${local.container_app_stable_fqdn}\n2. Upload the generated ZIP to Teams Admin Center:\n   https://admin.teams.microsoft.com -> Teams apps -> Manage apps -> Upload\n3. Assign the app to users or teams as needed.\n"
   ) : "Teams bot not configured (microsoft_app_id and microsoft_app_password not set)")
 }
 

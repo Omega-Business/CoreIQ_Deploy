@@ -47,9 +47,9 @@ ghcr_token = ""
 # SECTION 2: PROVIDED_BY_COREIQ — Do Not Change
 # ============================================================================
 
-# CoreIQ backend API key — leave empty. CoreIQ will push this directly to your Key Vault
-# after deployment. You never need to handle this value.
-# Only set this if CoreIQ instructs you to (e.g. for emergency re-provisioning).
+# Shared secret for authenticating requests from forward container to CoreIQ DO backend
+# CoreIQ team will provide this value before deployment
+# Format: Bearer token (keep secret, treat like a password)
 backend_api_key = ""
 
 # DO backend URL for complex query processing and authentication
@@ -71,18 +71,20 @@ ghcr_image = "ghcr.io/omega-business/coreiq-client:latest"
 foundry_sku = "S0"
 
 # Foundry model to deploy for local query routing
-# OpenAI models:    foundry_model = "gpt-5.4-nano"  foundry_model_format = "OpenAI"  foundry_model_version = "2025-04-14"
+# OpenAI models:    foundry_model = "gpt-5.4-nano"  foundry_model_format = "OpenAI"  foundry_model_version = "2026-03-17"
 # Microsoft Phi:    foundry_model = "Phi-3.5-mini-instruct"  foundry_model_format = "Microsoft"  foundry_model_version = "2"
 foundry_model         = "gpt-5.4-nano"
-foundry_model_version = "2025-04-14"
+foundry_model_version = "2026-03-17"
 foundry_model_format  = "OpenAI"
 
-# Qdrant cluster URL (provided by CoreIQ)
-qdrant_url = "https://<cluster-id>.us-east4-0.gcp.cloud.qdrant.io"
+# Set to true to deploy all infrastructure without the model deployment.
+# Use when quota is pending approval — change to false and re-run
+# terraform apply once quota is granted.
+skip_model_deployment = false
 
-# Qdrant API key — leave empty. CoreIQ pushes it directly to Key Vault post-deploy,
-# scoped to your collection(s) once they exist. Never needs to appear in this file.
-# qdrant_api_key = ""
+# Qdrant cloud connection
+qdrant_url     = "https://<cluster-id>.us-east4-0.gcp.cloud.qdrant.io"
+qdrant_api_key = "<jwt-api-key>"
 
 # Workload profile — Dedicated environment for Key Vault secret references
 # D4 = 4 vCPU / 8 GB (minimum dedicated). Options: D4, D8, D16, E4, E8, E16
@@ -101,14 +103,6 @@ entra_app_client_id = ""
 # Treat as sensitive as a password
 entra_app_client_secret = ""
 
-# Object ID of CoreIQ's service principal in YOUR Azure tenant.
-# Step 1 — consent the CoreIQ app (one-time per tenant):
-#   az ad sp create --id <coreiq-app-id>
-# Step 2 — get the object ID:
-#   az ad sp show --id <coreiq-app-id> --query id -o tsv
-# Paste the output here. CoreIQ's App ID will be provided during onboarding.
-coreiq_sp_object_id = ""
-
 # DNS management — set to true once omegabusiness.us is migrated to DigitalOcean
 # Until then, add CNAME manually in Wix: {client_id}.coreiq → {container_app_fqdn}
 dns_managed_by_do = false
@@ -117,11 +111,11 @@ dns_managed_by_do = false
 # Create at: https://portal.azure.com → Azure Active Directory → App registrations → New registration
 # Set redirect URI to: https://token.botframework.com/.auth/web/redirect
 # After registration, create a client secret under "Certificates & secrets"
-# Set microsoft_app_type based on your registration: "MultiTenant" or "SingleTenant"
+# Set microsoft_app_type to "SingleTenant" for internal org deployments (no Microsoft approval needed)
 # Leave both ID and password empty ("") to deploy without Teams bot
 microsoft_app_id       = ""
 microsoft_app_password = ""
-microsoft_app_type     = "MultiTenant"
+microsoft_app_type     = "SingleTenant"
 
 # Secret key for signing browser session cookies in the forward container.
 # Generate with: openssl rand -hex 32

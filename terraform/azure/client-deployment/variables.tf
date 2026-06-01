@@ -64,7 +64,7 @@ variable "foundry_model" {
 variable "foundry_model_version" {
   description = "Model version string as listed in the Azure model catalog"
   type        = string
-  default     = "2025-04-14"
+  default     = "2026-03-17"
 }
 variable "foundry_model_format" {
   description = "Model publisher format — 'OpenAI' for GPT models, 'Microsoft' for Phi/Florence"
@@ -122,4 +122,9 @@ variable "microsoft_app_type" {
   description = "Azure AD app registration type — MultiTenant or SingleTenant"
   type        = string
   default     = "MultiTenant"
+}
+variable "skip_model_deployment" {
+  description = "Set to true to deploy all infrastructure without the AI Foundry model deployment. Use when quota has not been approved yet — re-run terraform apply with this set to false once quota is granted."
+  type        = bool
+  default     = false
 }
