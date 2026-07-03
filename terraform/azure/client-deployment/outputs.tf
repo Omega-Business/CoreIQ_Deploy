@@ -11,26 +11,6 @@ output "container_app_url" {
   value       = "https://${local.container_app_stable_fqdn}"
 }
 
-output "ai_foundry_endpoint" {
-  description = "Azure AI Foundry endpoint URL for model access"
-  value       = azurerm_cognitive_account.ai_foundry.endpoint
-}
-
-output "ai_foundry_region" {
-  description = "Azure region where AI Foundry is deployed"
-  value       = azurerm_cognitive_account.ai_foundry.location
-}
-
-output "cognitive_account_id" {
-  description = "Azure resource ID of the AI Foundry cognitive account"
-  value       = azurerm_cognitive_account.ai_foundry.id
-}
-
-output "cognitive_account_name" {
-  description = "Name of the AI Foundry cognitive account for API calls"
-  value       = azurerm_cognitive_account.ai_foundry.name
-}
-
 output "resource_group_name" {
   description = "Azure resource group name where all resources are deployed"
   value       = data.azurerm_resource_group.rg.name
@@ -62,9 +42,6 @@ output "deployment_summary" {
     client_id              = var.client_id
     region                 = data.azurerm_resource_group.rg.location
     container_url          = "https://${local.container_app_stable_fqdn}"
-    foundry_endpoint       = azurerm_cognitive_account.ai_foundry.endpoint
-    foundry_region         = azurerm_cognitive_account.ai_foundry.location
-    foundry_model_deployed = var.foundry_model
     key_vault              = azurerm_key_vault.kv.name
     backend_integration    = "BACKEND_URL and BACKEND_API_KEY configured in Container App environment"
   }
@@ -82,19 +59,12 @@ output "next_steps" {
     2. Container API endpoint:
        https://${local.container_app_stable_fqdn}
 
-    AI FOUNDRY INTEGRATION:
-    - Endpoint: ${azurerm_cognitive_account.ai_foundry.endpoint}
-    - Model: ${var.foundry_model} (deployed and ready)
-    - API key stored in Key Vault: ${azurerm_key_vault.kv.name}
-
     CREDENTIALS & SECURITY:
-    - FOUNDRY_API_KEY: Stored in Key Vault secret "foundry-api-key"
     - BACKEND_API_KEY: Stored in Container App secret "backend-api-key"
-    - Access via: az keyvault secret show --vault-name ${azurerm_key_vault.kv.name} --name foundry-api-key
+    - Access via: az keyvault secret show --vault-name ${azurerm_key_vault.kv.name} --name backend-api-key
 
     QUERY ROUTING:
-    - Simple queries → ${var.foundry_model} via Azure AI Foundry (local, fast, low cost)
-    - Complex queries → CoreIQ backend (${var.do_backend_url})
+    - All queries → CoreIQ backend (${var.do_backend_url})
 
     MONITORING & LOGS:
     - View container logs:
@@ -102,7 +72,6 @@ output "next_steps" {
 
     AZURE RESOURCES CREATED:
     - Container App: ${azurerm_container_app.app.name}
-    - AI Foundry: ${azurerm_cognitive_account.ai_foundry.name}
     - Key Vault: ${azurerm_key_vault.kv.name}
     - Resource Group: ${data.azurerm_resource_group.rg.name}
 
@@ -120,13 +89,10 @@ output "environment_variables_reference" {
   value = {
     CLIENT_ID                  = var.client_id
     BACKEND_URL                = var.do_backend_url
-    FOUNDRY_ENDPOINT           = azurerm_cognitive_account.ai_foundry.endpoint
-    FOUNDRY_MODEL              = var.foundry_model
     ENVIRONMENT                = "production"
     ENTRA_TENANT_ID            = var.azure_tenant_id
     SSO_ENABLED                = var.entra_app_client_id != "" ? "true" : "false"
     BACKEND_API_KEY_SECRET     = "backend-api-key"
-    FOUNDRY_API_KEY_SECRET     = "foundry-api-key"
   }
 }
 

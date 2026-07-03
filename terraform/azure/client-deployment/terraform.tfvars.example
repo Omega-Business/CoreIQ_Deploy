@@ -2,7 +2,7 @@
 # CoreIQ Azure Client Deployment Configuration
 # ============================================================================
 # This file defines the variables needed for deploying a CoreIQ forward
-# container to Azure with AI Foundry integration.
+# container to Azure Container Apps.
 #
 # Three sections below:
 #   1. REQUIRED: You MUST provide values for your deployment
@@ -30,7 +30,6 @@ azure_tenant_id = ""
 
 # Azure region where resources will be deployed
 # Examples: "eastus", "westeurope", "uksouth"
-# Note: Must have AI Foundry capacity for gpt-5.4-nano model
 location = "eastus"
 
 # Azure resource group name for organizing all deployed resources
@@ -57,30 +56,14 @@ backend_api_key = ""
 do_backend_url = "https://coreiq.omegabusiness.us/backend"
 
 # Container image from GitHub Container Registry
+# Must be coreiq-client-stable — built only on GitHub Releases. Do NOT point
+# clients at coreiq-client (builds on every push to main; dev/test only).
 # Format: ghcr.io/{owner}/{repo}:{tag}
-# Example: ghcr.io/marcusatomega/coreiq-client:latest
-ghcr_image = "ghcr.io/omega-business/coreiq-client:latest"
+ghcr_image = "ghcr.io/omega-business/coreiq-client-stable:latest"
 
 # ============================================================================
 # SECTION 3: OPTIONAL — Customize for Your Environment
 # ============================================================================
-
-# Azure AI Foundry SKU tier for deployment
-# Options: "S0" (default), "S1", "S2" — S0 is suitable for most deployments
-# Higher SKUs provide more capacity and concurrent requests
-foundry_sku = "S0"
-
-# Foundry model to deploy for local query routing
-# OpenAI models:    foundry_model = "gpt-5.4-nano"  foundry_model_format = "OpenAI"  foundry_model_version = "2026-03-17"
-# Microsoft Phi:    foundry_model = "Phi-3.5-mini-instruct"  foundry_model_format = "Microsoft"  foundry_model_version = "2"
-foundry_model         = "gpt-5.4-nano"
-foundry_model_version = "2026-03-17"
-foundry_model_format  = "OpenAI"
-
-# Set to true to deploy all infrastructure without the model deployment.
-# Use when quota is pending approval — change to false and re-run
-# terraform apply once quota is granted.
-skip_model_deployment = false
 
 # Qdrant cloud connection
 qdrant_url     = "https://<cluster-id>.us-east4-0.gcp.cloud.qdrant.io"

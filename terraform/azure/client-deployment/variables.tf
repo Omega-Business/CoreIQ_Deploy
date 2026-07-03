@@ -11,6 +11,11 @@ variable "backend_api_key" {
   sensitive   = true
   default     = ""
 }
+variable "restart_push_key" {
+  description = "Shared secret (not per-client) authenticating the backend's outbound restart call to this container — must match the backend's own RESTART_PUSH_KEY env var"
+  type        = string
+  sensitive   = true
+}
 
 variable "coreiq_sp_object_id" {
   description = "Object ID of CoreIQ's service principal in the client's Azure tenant. Run: az ad sp create --id <coreiq-app-id> && az ad sp show --id <coreiq-app-id> --query id -o tsv"
@@ -22,9 +27,9 @@ variable "do_backend_url" {
   type        = string
 }
 variable "ghcr_image" {
-  description = "GHCR image ref (e.g. ghcr.io/org/coreiq-client:latest)"
+  description = "GHCR image ref — must point at coreiq-client-stable (built only on GitHub Releases), not coreiq-client (builds on every push to main, for internal iteration/testing only). e.g. ghcr.io/org/coreiq-client-stable:latest"
   type        = string
-  default     = "ghcr.io/omega-business/coreiq-client:latest"
+  default     = "ghcr.io/omega-business/coreiq-client-stable:latest"
 }
 
 # [Client] — Provided by the client organization
@@ -50,26 +55,6 @@ variable "ghcr_token" {
   description = "GitHub PAT or Actions token for GHCR pull"
   type        = string
   sensitive   = true
-}
-variable "foundry_sku" {
-  description = "Azure AI Foundry SKU — valid values: S0, S1, S2, S3, S4, S5, S6, P0, P1, P2"
-  type        = string
-  default     = "S0"
-}
-variable "foundry_model" {
-  description = "Model deployment name and model name (e.g. 'gpt-5.4-nano', 'Phi-3.5-mini-instruct')"
-  type        = string
-  default     = "gpt-5.4-nano"
-}
-variable "foundry_model_version" {
-  description = "Model version string as listed in the Azure model catalog"
-  type        = string
-  default     = "2026-03-17"
-}
-variable "foundry_model_format" {
-  description = "Model publisher format — 'OpenAI' for GPT models, 'Microsoft' for Phi/Florence"
-  type        = string
-  default     = "OpenAI"
 }
 variable "session_secret" {
   description = "Secret key for signing client agent session cookies. Generate with: openssl rand -hex 32"
@@ -122,9 +107,4 @@ variable "microsoft_app_type" {
   description = "Azure AD app registration type — MultiTenant or SingleTenant"
   type        = string
   default     = "MultiTenant"
-}
-variable "skip_model_deployment" {
-  description = "Set to true to deploy all infrastructure without the AI Foundry model deployment. Use when quota has not been approved yet — re-run terraform apply with this set to false once quota is granted."
-  type        = bool
-  default     = false
 }

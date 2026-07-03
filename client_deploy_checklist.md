@@ -115,6 +115,8 @@
   - **Copy the token immediately** — you won't see it again
   - Save as: `GHCR_TOKEN` (keep it private)
 
+> **Which image?** `terraform.tfvars`'s `ghcr_image` must point at `coreiq-client-stable` (built only when CoreIQ publishes a GitHub Release), never `coreiq-client` (builds on every push to `main` — internal iteration/testing only, not meant for client deployments).
+
 ### CoreIQ Backend URL
 
 - [ ] **Backend URL**
@@ -806,4 +808,24 @@ Until then, omega continues to function with inline secrets — it's functional 
 ### Terraform import commands (if ever needed)
 
 If you want to bring an existing Consumption-environment deployment under Terraform management **without** KV secret references, you would need to temporarily remove the `key_vault_secret_id` blocks and revert to inline `value` secrets. This is not recommended — use a fresh resource group instead.
+
+---
+
+## Phase 8: Updating a Deployed Client to a New Release
+
+Client containers run `coreiq-client-stable`, which only rebuilds when CoreIQ publishes a **GitHub Release** (see `.github/workflows/publish-release-container.yml`). Pushing to `main` alone does **not** reach clients — that only updates `coreiq-client`, the internal dev/test image.
+
+- [ ] **Cut a GitHub Release** once changes are ready to ship — tag it (e.g. `v1.4.0`) and write the release description as client-facing notes (what changed, why it matters). That description is what admins see in the in-app update banner.
+- [ ] Publishing the release automatically:
+  - Builds and pushes `coreiq-client-stable:latest` + `:{tag}` + `:{commit sha}` to GHCR
+  - Notifies the DO backend of the new version (requires the `DO_BACKEND_URL` / `BACKEND_API_KEY` GitHub Actions secrets to be set — see prior turn's summary if these aren't configured yet)
+- [ ] **Admins now see an in-app banner** (`Chat` layout, admin-only) the next time they load the portal, showing the release notes
+- [ ] **Force the actual redeploy** — publishing the image alone does not make Azure Container Apps re-pull it (floating `:latest` tags are never detected as "changed" by Terraform or Azure). Run:
+  ```bash
+  python scripts/update_forward_containers.py --client {client_id}
+  # or, to update every client_cloud-deployed client at once:
+  python scripts/update_forward_containers.py
+  ```
+- [ ] **Verify the update landed** — check `https://{client-fqdn}/healthz` reports the new `image_sha`, or run `python scripts/check_client_versions.py` to check all clients at once
+- [ ] A daily scheduled check (`.github/workflows/check-client-versions.yml`) also runs this comparison automatically and opens a GitHub Issue if any client is still stale after a release
 

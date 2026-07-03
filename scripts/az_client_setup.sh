@@ -403,7 +403,7 @@ session_secret        = "${SESSION_SECRET}"
 
 backend_api_key = "${BACKEND_API_KEY}"
 do_backend_url  = "https://coreiq.omegabusiness.us/backend"
-ghcr_image      = "ghcr.io/omega-business/coreiq-client:latest"
+ghcr_image      = "ghcr.io/omega-business/coreiq-client-stable:latest"
 
 qdrant_url     = "${QDRANT_URL}"
 qdrant_api_key = "${QDRANT_API_KEY}"

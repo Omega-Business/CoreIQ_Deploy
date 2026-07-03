@@ -3,12 +3,10 @@ terraform {
   required_version = ">= 1.3"
   required_providers {
     azurerm = { source = "hashicorp/azurerm", version = "~> 3.48" }
-    azapi   = { source = "azure/azapi", version = "~> 2.0" }
     digitalocean = { source = "digitalocean/digitalocean", version = "~> 2.0" }
+    random = { source = "hashicorp/random", version = "~> 3.6" }
   }
 }
-
-provider "azapi" {}
 
 # DigitalOcean provider — configured when DNS is moved from Wix
 # Until then, set via environment: export DIGITALOCEAN_TOKEN="your-token"
@@ -67,55 +65,6 @@ resource "azurerm_key_vault_secret" "api_key" {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Azure AI Foundry — local query routing model (OpenAI GPT or Microsoft Phi)
-# ─────────────────────────────────────────────────────────────────────────────
-
-resource "azurerm_cognitive_account" "ai_foundry" {
-  name                = "coreiq-${local.safe_client_id}-foundry"
-  location            = data.azurerm_resource_group.rg.location
-  resource_group_name = data.azurerm_resource_group.rg.name
-  kind                = "OpenAI"
-  sku_name            = var.foundry_sku
-
-  tags = {
-    Project   = "CoreIQ"
-    Component = "AI-Foundry"
-    Client    = var.client_id
-  }
-}
-
-resource "azapi_resource" "foundry_model_deployment" {
-  count     = var.skip_model_deployment ? 0 : 1
-  type      = "Microsoft.CognitiveServices/accounts/deployments@2024-06-01-preview"
-  name      = var.foundry_model
-  parent_id = azurerm_cognitive_account.ai_foundry.id
-
-  body = {
-    properties = {
-      model = {
-        format  = var.foundry_model_format
-        name    = var.foundry_model
-        version = var.foundry_model_version
-      }
-    }
-    sku = {
-      name     = "GlobalStandard"
-      capacity = 10
-    }
-  }
-
-  depends_on = [azurerm_cognitive_account.ai_foundry]
-}
-
-# Store Foundry API key in Key Vault
-resource "azurerm_key_vault_secret" "foundry_api_key" {
-  name         = "foundry-api-key"
-  value        = azurerm_cognitive_account.ai_foundry.primary_access_key
-  key_vault_id = azurerm_key_vault.kv.id
-  depends_on   = [azurerm_key_vault_access_policy.deployer]
-}
-
-# ─────────────────────────────────────────────────────────────────────────────
 # Key Vault secrets — sourced by container app via managed identity
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -129,6 +78,16 @@ resource "azurerm_key_vault_secret" "qdrant_api_key" {
 resource "azurerm_key_vault_secret" "session_secret" {
   name         = "session-secret"
   value        = var.session_secret
+  key_vault_id = azurerm_key_vault.kv.id
+  depends_on   = [azurerm_key_vault_access_policy.deployer]
+}
+
+# Shared value both the backend and every client_agent hold in plaintext,
+# used only for the backend's outbound POST {container_url}/internal/restart
+# call — not tenant-bound, must match the backend's own RESTART_PUSH_KEY env var.
+resource "azurerm_key_vault_secret" "restart_push_key" {
+  name         = "restart-push-key"
+  value        = var.restart_push_key
   key_vault_id = azurerm_key_vault.kv.id
   depends_on   = [azurerm_key_vault_access_policy.deployer]
 }
@@ -210,11 +169,6 @@ resource "azurerm_container_app" "app" {
     identity            = azurerm_user_assigned_identity.ca_identity.id
   }
   secret {
-    name                = "foundry-api-key"
-    key_vault_secret_id = azurerm_key_vault_secret.foundry_api_key.versionless_id
-    identity            = azurerm_user_assigned_identity.ca_identity.id
-  }
-  secret {
     name                = "qdrant-api-key"
     key_vault_secret_id = azurerm_key_vault_secret.qdrant_api_key.versionless_id
     identity            = azurerm_user_assigned_identity.ca_identity.id
@@ -222,6 +176,11 @@ resource "azurerm_container_app" "app" {
   secret {
     name                = "session-secret"
     key_vault_secret_id = azurerm_key_vault_secret.session_secret.versionless_id
+    identity            = azurerm_user_assigned_identity.ca_identity.id
+  }
+  secret {
+    name                = "restart-push-key"
+    key_vault_secret_id = azurerm_key_vault_secret.restart_push_key.versionless_id
     identity            = azurerm_user_assigned_identity.ca_identity.id
   }
   dynamic "secret" {
@@ -265,18 +224,6 @@ resource "azurerm_container_app" "app" {
         value = var.entra_app_client_id != "" ? "true" : "false"
       }
       env {
-        name  = "FOUNDRY_ENDPOINT"
-        value = azurerm_cognitive_account.ai_foundry.endpoint
-      }
-      env {
-        name  = "FOUNDRY_MODEL"
-        value = var.foundry_model
-      }
-      env {
-        name        = "FOUNDRY_API_KEY"
-        secret_name = "foundry-api-key"
-      }
-      env {
         name  = "QDRANT_URL"
         value = var.qdrant_url
       }
@@ -287,6 +234,10 @@ resource "azurerm_container_app" "app" {
       env {
         name        = "SESSION_SECRET"
         secret_name = "session-secret"
+      }
+      env {
+        name        = "RESTART_PUSH_KEY"
+        secret_name = "restart-push-key"
       }
       dynamic "env" {
         for_each = local.bot_enabled ? [1] : []
@@ -333,6 +284,36 @@ resource "digitalocean_record" "client_cname" {
   name   = "${var.client_id}.coreiq"
   value  = azurerm_container_app.app.latest_revision_fqdn
   ttl    = 3600
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Register this container's URL with the backend — authenticates with this
+# client's own issued API key (backend_api_key), validated per-client on the
+# backend (services/api_key_service.py), so a client can only register its
+# own container_url. Only runs when the key is known at apply time (CoreIQ's
+# own deployments, where the key is issued before running terraform). For
+# client-managed deployments where the key is pushed post-deploy via Key
+# Vault (see client_deploy_checklist.md), this step is skipped and the
+# CoreIQ team registers container_url manually once the key lands.
+# ─────────────────────────────────────────────────────────────────────────────
+
+resource "null_resource" "register_container_url" {
+  count = var.backend_api_key != "" ? 1 : 0
+
+  triggers = {
+    container_url = "https://${local.container_app_stable_fqdn}"
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      curl -sf -X POST "${var.do_backend_url}/internal/clients/${var.client_id}/container-url" \
+        -H "Authorization: Bearer ${var.backend_api_key}" \
+        -H "Content-Type: application/json" \
+        -d '{"url": "https://${local.container_app_stable_fqdn}"}'
+    EOT
+  }
+
+  depends_on = [azurerm_container_app.app]
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
