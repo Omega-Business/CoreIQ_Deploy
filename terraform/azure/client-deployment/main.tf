@@ -62,6 +62,15 @@ resource "azurerm_key_vault_secret" "api_key" {
   value        = var.backend_api_key
   key_vault_id = azurerm_key_vault.kv.id
   depends_on   = [azurerm_key_vault_access_policy.deployer]
+
+  # var.backend_api_key only seeds the initial value. Once a client is
+  # migrated to per-client keys (services/api_key_service.py), the real
+  # value is rotated out-of-band via services/secret_store_client.py's
+  # Key Vault push — Terraform must not fight that rotation on every
+  # subsequent apply by resetting it back to the tfvars bootstrap value.
+  lifecycle {
+    ignore_changes = [value]
+  }
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
