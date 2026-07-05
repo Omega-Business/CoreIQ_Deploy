@@ -42,6 +42,12 @@ resource_group_name = "coreiq-{client_id}"
 # Required only if the image repository is private
 ghcr_token = ""
 
+# Secret key for signing browser session cookies in the forward container.
+# Generate with: openssl rand -hex 32
+# If left empty, a random key is generated per restart (sessions lost on restart).
+# Strongly recommended — do not leave empty for a real deployment.
+session_secret = ""
+
 # ============================================================================
 # SECTION 2: PROVIDED_BY_COREIQ — Do Not Change
 # ============================================================================
@@ -50,6 +56,11 @@ ghcr_token = ""
 # CoreIQ team will provide this value before deployment
 # Format: Bearer token (keep secret, treat like a password)
 backend_api_key = ""
+
+# Shared secret (NOT per-client) authenticating the backend's outbound
+# restart call to this container — must match the backend's own
+# RESTART_PUSH_KEY env var. CoreIQ team will provide this value.
+restart_push_key = ""
 
 # DO backend URL for complex query processing and authentication
 # This is the CoreIQ backend endpoint — all login, embeddings, and escalated queries route here
@@ -64,10 +75,6 @@ ghcr_image = "ghcr.io/omega-business/coreiq-client-stable:latest"
 # ============================================================================
 # SECTION 3: OPTIONAL — Customize for Your Environment
 # ============================================================================
-
-# Qdrant cloud connection
-qdrant_url     = "https://<cluster-id>.us-east4-0.gcp.cloud.qdrant.io"
-qdrant_api_key = "<jwt-api-key>"
 
 # Workload profile — Dedicated environment for Key Vault secret references
 # D4 = 4 vCPU / 8 GB (minimum dedicated). Options: D4, D8, D16, E4, E8, E16
@@ -99,11 +106,6 @@ dns_managed_by_do = false
 microsoft_app_id       = ""
 microsoft_app_password = ""
 microsoft_app_type     = "SingleTenant"
-
-# Secret key for signing browser session cookies in the forward container.
-# Generate with: openssl rand -hex 32
-# If left empty, a random key is generated per restart (sessions lost on restart).
-session_secret = ""
 
 # ============================================================================
 # End of Configuration

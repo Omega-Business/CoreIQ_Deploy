@@ -50,23 +50,8 @@
     - **Admin portal credentials** via secure one-time link (temporary password, change on first login)
 
 - [ ] **Choose Azure Region**
-  - Must support both:
-    - ✅ Azure Container Apps
-    - ✅ Azure AI Foundry (gpt-5.4-nano model)
+  - Must support Azure Container Apps (Dedicated workload profiles)
   - Recommended regions: `eastus`, `westeurope`, `uksouth`
-  - Confirm availability: Contact Azure support or check [AI Foundry regions](https://learn.microsoft.com/en-us/azure/ai-foundry/concepts/regional-support)
-
-- [ ] **Confirm AI Foundry model quota** ⚠️ Do this before running Terraform
-  - New Azure subscriptions have zero quota allocated by default — Terraform will fail at the model deployment step if quota is not in place
-  - Check current quota: Azure Portal → Subscriptions → your subscription → Usage + quotas → search "gpt-5.4-nano"
-  - **If quota shows 0:** Request an increase before running `terraform apply`. Approvals typically take 1-2 business days. You can proceed with all other Terraform steps in the meantime — only the model deployment will fail.
-  - **If quota is already allocated:** No action needed, proceed normally.
-  - Existing subscriptions with prior Azure OpenAI usage almost always have quota already — this check is primarily for brand-new subscriptions.
-
-- [ ] **Decide Environment Name** (optional)
-  - Default: `production`
-  - Options: `dev`, `staging`, `production`
-  - Used for resource tagging and logging
 
 ---
 
@@ -125,18 +110,11 @@
 
 ### CoreIQ-Provided Credentials
 
-- [ ] **Qdrant Cluster URL**
-  - Provided by CoreIQ team
-  - Format: `https://<cluster-id>.us-east4-0.gcp.cloud.qdrant.io`
-  - Save as: `QDRANT_URL`
+> Qdrant is not part of this list — the forward-proxy container this module deploys never talks to Qdrant directly (only the shared DO backend does), so no Qdrant URL/API key is provisioned here. Likewise, there is no AI Foundry / Cognitive Services resource in this module — generation is handled entirely by the shared DO backend, not by per-client Azure infrastructure.
 
-- [ ] **Qdrant API Key**
-  - Provided by CoreIQ team (JWT API key — keep private)
-  - Save as: `QDRANT_API_KEY`
-
-- [ ] **Confirm Azure Region AI Foundry Support**
-  - Ask CoreIQ: "Does [your-region] have AI Foundry quota for gpt-5.4-nano?"
-  - If no, choose alternative region and repeat phase 1 region selection
+- [ ] **restart_push_key**
+  - Provided by CoreIQ team (shared secret, not per-client)
+  - Must match the backend's own `RESTART_PUSH_KEY` — used only for the backend's outbound restart call to your container
 
 ### Teams Bot App Registration (Optional — skip if not using Microsoft Teams)
 
@@ -202,6 +180,10 @@ Replace placeholders in the REQUIRED section:
   - Value: UUID from Azure (Phase 2)
   - Format: `87654321-4321-4321-4321-cba987654321`
 
+- [ ] **location**
+  - Value: Azure region chosen in Phase 1
+  - Default: `eastus` — leave as-is if following recommendation
+
 - [ ] **resource_group_name**
   - Value: `coreiq-{client_id}` (recommended)
   - Example: `coreiq-acme`
@@ -226,30 +208,19 @@ Values provided by CoreIQ team:
   - CoreIQ will push the real key to your Key Vault after deployment
   - The container will start with a placeholder and become fully functional once CoreIQ pushes the key (within minutes of you sharing your `key_vault_uri` output)
 
+- [ ] **restart_push_key**
+  - Value: From CoreIQ team (Phase 2) — shared secret, not per-client
+  - Must match the backend's own `RESTART_PUSH_KEY`
+
 - [ ] **do_backend_url**
   - Value: From CoreIQ team (Phase 2)
   - Format: `https://coreiq.omegabusiness.us/backend`
   - Pre-filled with CoreIQ's production URL
 
-- [ ] **qdrant_url**
-  - Value: Qdrant vector database cluster URL (provided by CoreIQ)
-  - Format: `https://<cluster-id>.us-east4-0.gcp.cloud.qdrant.io`
-
-- [ ] **qdrant_api_key**
-  - Value: Qdrant JWT API key (provided by CoreIQ)
-  - Keep private — Terraform will store it in Azure Key Vault during provisioning
+- [ ] **ghcr_image**
+  - Leave as default (`ghcr.io/omega-business/coreiq-client-stable:latest`) unless CoreIQ instructs otherwise
 
 ### Fill OPTIONAL Section (Optional)
-
-- [ ] **environment**
-  - Default: `production` (use this)
-  - Alternatives: `dev`, `staging`
-  - Leave as-is if unsure
-
-- [ ] **foundry_sku**
-  - Default: `S0` (recommended for most deployments)
-  - Alternatives: `S1`, `S2` (if higher throughput needed)
-  - Leave as-is if unsure
 
 - [ ] **entra_app_client_id** (Optional — skip if not using SSO)
   - Only needed if: You want Azure Entra ID single sign-on
@@ -315,16 +286,16 @@ Values provided by CoreIQ team:
   terraform plan -out=tfplan
   ```
   - Review output carefully for:
-    - ✅ Correct number of resources (~18-22 resources for a standard deployment without Teams bot)
+    - ✅ Correct number of resources (~9-10 resources for a standard deployment without Teams bot; ~12-13 with Teams bot)
     - ✅ Correct resource group name: `coreiq-{client_id}`
     - ✅ Correct location: `{your-region}`
     - ✅ Resources being CREATED (no DESTROY unless re-deploying)
-  - Expected resources (~12 standard, ~15 with Teams bot):
+  - Expected resources:
     - [ ] 1x User-assigned managed identity
-    - [ ] 1x Key Vault + 2x access policies + 4x secrets (backend key, Foundry key, Qdrant key, session secret)
+    - [ ] 1x Key Vault + 2x access policies + 3x secrets (backend key, restart-push key, session secret)
     - [ ] 1x Container App Environment (Dedicated, D4 workload profile)
     - [ ] 1x Container App
-    - [ ] 1x AI Foundry cognitive account + 1x model deployment
+    - [ ] 1x `null_resource` registering the container URL with the backend (only if `backend_api_key` is set at apply time — typically left empty per this checklist, so usually not created on first apply)
     - [ ] 1x DigitalOcean DNS record (only if `dns_managed_by_do = true`)
     - [ ] Optionally: 1x Bot Service + 1x Teams channel + 1x KV secret (only if `microsoft_app_id` is set)
 
@@ -345,7 +316,7 @@ Values provided by CoreIQ team:
     
     Outputs:
     container_app_url = https://coreiq-{client_id}.azurecontainerapps.io
-    ai_foundry_endpoint = https://coreiq-{client_id}-foundry.openai.azure.com/
+    key_vault_uri = https://ciq-{client_id}-kv.vault.azure.net/
     ...
     ```
   - Takes: 3-7 minutes (mostly waiting for Container App to provision)
@@ -362,24 +333,18 @@ Values provided by CoreIQ team:
   ```
   - CoreIQ needs these to know where to push your secrets
 
-- [ ] **CoreIQ will send you two keys via secure one-time link:**
+- [ ] **CoreIQ will send you one key via secure one-time link:**
   - `coreiq-api-key` — backend API key
-  - `qdrant-api-key` — Qdrant cluster access key (scoped to your collection once it exists)
 
-- [ ] **Push each key to Key Vault** (paste value from the secure link — do not save it)
+- [ ] **Push the key to Key Vault** (paste value from the secure link — do not save it)
   ```bash
   az keyvault secret set \
     --vault-name ciq-{client_id}-kv \
     --name coreiq-api-key \
     --value "<paste key here>"
-
-  az keyvault secret set \
-    --vault-name ciq-{client_id}-kv \
-    --name qdrant-api-key \
-    --value "<paste key here>"
   ```
-  - Expected output: JSON confirming each secret was set
-  - Keys are now in Key Vault — you do not need to keep copies
+  - Expected output: JSON confirming the secret was set
+  - The key is now in Key Vault — you do not need to keep a copy
 
 - [ ] **Restart the container to pick up the keys**
   ```bash
@@ -475,62 +440,11 @@ Values provided by CoreIQ team:
     ```
   - If 400/401/500: Check error message, see Troubleshooting below
 
-### Verify AI Foundry Integration
-
-- [ ] **Check Foundry Account Exists**
-  ```bash
-  az cognitiveservices account show \
-    --resource-group coreiq-{client_id} \
-    --name coreiq-{client_id}-foundry
-  ```
-  - Look for: `"provisioningState": "Succeeded"`
-
-- [ ] **Check Foundry Model Deployment**
-  ```bash
-  az cognitiveservices account deployment list \
-    --resource-group coreiq-{client_id} \
-    --name coreiq-{client_id}-foundry
-  ```
-  - Should list your configured model (e.g., `gpt-5.4-nano`) with `"provisioningState": "Succeeded"`
-
 ---
 
 ## Phase 5b: Post-Deployment Hardening
 
 > These steps can only be completed after deployment because they depend on resources that don't exist until `terraform apply` has run.
-
-### Scope Qdrant API Key to Client Collections
-
-The Qdrant key used during initial deployment is a broad bootstrap key. Once the client's collections exist, replace it with a collection-scoped key.
-
-- [ ] **Verify collections exist**
-  ```bash
-  # Confirm the client collection is present in Qdrant Cloud dashboard
-  # or ask CoreIQ to confirm
-  ```
-
-- [ ] **Generate a scoped JWT key in Qdrant Cloud**
-  - Log in to Qdrant Cloud → your cluster → **API Keys**
-  - Create a new key scoped to `{client_id}` collection(s) only
-  - Copy the new key
-
-- [ ] **Rotate the Key Vault secret**
-  ```bash
-  az keyvault secret set \
-    --vault-name ciq-{client_id}-kv \
-    --name qdrant-api-key \
-    --value "<new-scoped-key>"
-  ```
-  - Terraform will not overwrite this on future applies
-
-- [ ] **Force a new revision to pick up the updated Key Vault secret**
-  ```bash
-  az containerapp update \
-    --resource-group coreiq-{client_id} \
-    --name coreiq-{client_id} \
-    --revision-suffix "v2"
-  ```
-  > A revision *restart* does not reliably reload Key Vault secrets — creating a new revision guarantees the latest secret values are fetched on startup.
 
 ### Enable Teams Bot (Optional — when ready)
 
@@ -570,7 +484,6 @@ The Qdrant key used during initial deployment is a broad bootstrap key. Once the
 
 - [ ] **Document Endpoints**
   - Container App URL: `https://coreiq-{client_id}.azurecontainerapps.io`
-  - AI Foundry Endpoint: `https://coreiq-{client_id}-foundry.openai.azure.com/`
   - Resource Group: `coreiq-{client_id}`
   - Save in password manager or secure doc
 
@@ -618,7 +531,6 @@ The Qdrant key used during initial deployment is a broad bootstrap key. Once the
 - [ ] Check logs: `az containerapp logs show --resource-group coreiq-{client_id} --name coreiq-{client_id}`
 - [ ] Common causes:
   - BACKEND_URL not set or invalid → Check terraform.tfvars
-  - FOUNDRY_ENDPOINT unreachable → Confirm AI Foundry deployed
   - BACKEND_API_KEY rejected → Verify key with CoreIQ team
 - [ ] Force a new revision: `az containerapp update --resource-group coreiq-{client_id} --name coreiq-{client_id} --revision-suffix "v2"`
 
@@ -643,26 +555,6 @@ The Qdrant key used during initial deployment is a broad bootstrap key. Once the
     --name coreiq-api-key \
     --value "new-key-here"
   ```
-
-### Foundry "Token Expired"
-
-**Symptom:** Logs show "Invalid Foundry API key"
-
-**Steps:**
-- [ ] Check if Foundry resources exist:
-  ```bash
-  az cognitiveservices account show \
-    --resource-group coreiq-{client_id} \
-    --name coreiq-{client_id}-foundry
-  ```
-- [ ] Regenerate Foundry API key:
-  ```bash
-  az cognitiveservices account keys list \
-    --resource-group coreiq-{client_id} \
-    --name coreiq-{client_id}-foundry
-  ```
-- [ ] Update Key Vault secret with new key
-- [ ] Restart container
 
 ### Frontend Loads but Queries Fail
 
@@ -689,7 +581,7 @@ The Qdrant key used during initial deployment is a broad bootstrap key. Once the
 **Steps:**
 - [ ] Verify Azure authentication: `az account show`
 - [ ] Re-login if needed: `az login`
-- [ ] Check quota in region (Container Apps, AI Foundry)
+- [ ] Check Container Apps Dedicated workload profile quota in region
 - [ ] Run `terraform validate` to check syntax
 - [ ] Delete `.terraform` and re-run `terraform init`:
   ```bash
@@ -758,11 +650,7 @@ Every environment variable injected into the container and how it gets there.
 | `ENVIRONMENT` | hardcoded `"production"` | set in main.tf — no tfvars entry needed |
 | `ENTRA_TENANT_ID` | `var.azure_tenant_id` | tfvars (REQUIRED) → plain env var |
 | `SSO_ENABLED` | derived | `"true"` if `entra_app_client_id` is set, otherwise `"false"` — no direct tfvars entry |
-| `FOUNDRY_ENDPOINT` | auto-generated | Terraform creates AI Foundry account → endpoint output → plain env var |
-| `FOUNDRY_MODEL` | `var.foundry_model` | tfvars (OPTIONAL, default `gpt-5.4-nano`) → plain env var |
-| `FOUNDRY_API_KEY` | auto-generated | Terraform reads Foundry primary key → Key Vault secret `foundry-api-key` → Container App secret ref |
-| `QDRANT_URL` | `var.qdrant_url` | tfvars (PROVIDED_BY_COREIQ) → plain env var |
-| `QDRANT_API_KEY` | `var.qdrant_api_key` | tfvars (PROVIDED_BY_COREIQ) → Key Vault secret `qdrant-api-key` → Container App secret ref |
+| `RESTART_PUSH_KEY` | `var.restart_push_key` | tfvars (PROVIDED_BY_COREIQ) → Key Vault secret `restart-push-key` → Container App secret ref |
 | `MICROSOFT_APP_ID` | `var.microsoft_app_id` | tfvars (OPTIONAL) → plain env var — omitted if empty |
 | `MICROSOFT_APP_PASSWORD` | `var.microsoft_app_password` | tfvars (OPTIONAL) → Key Vault secret `microsoft-app-password` → Container App secret ref — omitted if empty |
 
@@ -776,18 +664,20 @@ Every environment variable injected into the container and how it gets there.
 
 ### Drift Summary (as of 2026-05-28)
 
-| Resource | Terraform expects | Omega actual | Status |
+> **Foundry and Qdrant rows below are historical.** Both were later removed from the Terraform module entirely (Foundry: commit `db5823c`, "Local query-routing tier was already dead in client_agent's actual code path"; Qdrant: this session, since the forward container never talks to Qdrant directly). The "Terraform expects" column for those two rows reflects what the module required on 2026-05-28, not what it requires today — kept here only as a record of the drift analysis performed at that time, not as current guidance.
+
+| Resource | Terraform expects (2026-05-28) | Omega actual | Status |
 |---|---|---|---|
 | Container App Environment | Dedicated (WorkloadProfiles) with D4 profile | Consumption (`workloadProfiles: null`) | ❌ Requires recreation |
 | Managed identity | User-assigned `coreiq-omega-identity` | None (SystemAssigned on Container App) | ❌ Not created |
 | KV secret: backend API key | `coreiq-api-key` | `coreiq-api-key` | ✅ Matches |
-| KV secret: Foundry key | `foundry-api-key` | `foundry-api-key` | ✅ Matches |
-| KV secret: Qdrant key | `qdrant-api-key` | `qdrant-api` | ❌ Name mismatch |
+| KV secret: Foundry key *(historical — removed from module)* | `foundry-api-key` | `foundry-api-key` | ✅ Matched at the time |
+| KV secret: Qdrant key *(historical — removed from module)* | `qdrant-api-key` | `qdrant-api` | ❌ Name mismatch at the time |
 | KV secret: session secret | `session-secret` | Missing | ❌ Not created |
 | KV secret: bot password | `microsoft-app-password` | Missing (set as plain env var) | ❌ Not created |
 | Container App secrets | KV references for all secrets except ghcr | Plain inline values (`backend-api-key`, `foundry-api-key`, `ghcr-token`) | ❌ Not KV-backed |
 | Bot Service | `coreiq-omega-bot` (auto-named) | `CoreIQ` (manually created) | ⚠️ Different name |
-| Foundry model deployment | 1x deployment (`var.foundry_model`) | 2x deployments (`Phi-35-mini-instruct`, `gpt-5.4-nano`) | ⚠️ Extra deployment |
+| Foundry model deployment *(historical — removed from module)* | 1x deployment (`var.foundry_model`) | 2x deployments (`Phi-35-mini-instruct`, `gpt-5.4-nano`) | ⚠️ Extra deployment at the time |
 
 ### Why the Consumption environment matters
 

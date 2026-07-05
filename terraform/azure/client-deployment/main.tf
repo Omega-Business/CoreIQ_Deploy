@@ -76,13 +76,11 @@ resource "azurerm_key_vault_secret" "api_key" {
 # ─────────────────────────────────────────────────────────────────────────────
 # Key Vault secrets — sourced by container app via managed identity
 # ─────────────────────────────────────────────────────────────────────────────
-
-resource "azurerm_key_vault_secret" "qdrant_api_key" {
-  name         = "qdrant-api-key"
-  value        = var.qdrant_api_key
-  key_vault_id = azurerm_key_vault.kv.id
-  depends_on   = [azurerm_key_vault_access_policy.deployer]
-}
+#
+# Note: no Qdrant secret here. client_agent (the forward-proxy container this
+# module deploys) never talks to Qdrant directly — only the shared DO backend
+# does — so a Qdrant URL/API key has no reason to live in this container's
+# Key Vault at all.
 
 resource "azurerm_key_vault_secret" "session_secret" {
   name         = "session-secret"
@@ -178,11 +176,6 @@ resource "azurerm_container_app" "app" {
     identity            = azurerm_user_assigned_identity.ca_identity.id
   }
   secret {
-    name                = "qdrant-api-key"
-    key_vault_secret_id = azurerm_key_vault_secret.qdrant_api_key.versionless_id
-    identity            = azurerm_user_assigned_identity.ca_identity.id
-  }
-  secret {
     name                = "session-secret"
     key_vault_secret_id = azurerm_key_vault_secret.session_secret.versionless_id
     identity            = azurerm_user_assigned_identity.ca_identity.id
@@ -231,14 +224,6 @@ resource "azurerm_container_app" "app" {
       env {
         name  = "SSO_ENABLED"
         value = var.entra_app_client_id != "" ? "true" : "false"
-      }
-      env {
-        name  = "QDRANT_URL"
-        value = var.qdrant_url
-      }
-      env {
-        name        = "QDRANT_API_KEY"
-        secret_name = "qdrant-api-key"
       }
       env {
         name        = "SESSION_SECRET"

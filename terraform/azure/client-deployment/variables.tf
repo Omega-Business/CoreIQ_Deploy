@@ -62,16 +62,6 @@ variable "session_secret" {
   sensitive   = true
   default     = ""
 }
-variable "qdrant_url" {
-  description = "Qdrant cloud cluster URL (e.g. https://<id>.us-east4-0.gcp.cloud.qdrant.io)"
-  type        = string
-}
-variable "qdrant_api_key" {
-  description = "Qdrant API key (JWT) — leave empty, CoreIQ will push it directly to Key Vault post-deploy"
-  type        = string
-  sensitive   = true
-  default     = ""
-}
 variable "workload_profile_type" {
   description = "Azure Container App workload profile type — D4 (4 vCPU/8 GB), D8, D16, E4, E8, E16"
   type        = string
