@@ -6,6 +6,7 @@ Usage:
     python scripts/package_teams_manifest.py \
         --app-id <MICROSOFT_APP_ID> \
         --domain <DOMAIN> \
+        [--client-id <CLIENT_ID>] \
         [--output <path/to/output.zip>]
 """
 
@@ -33,9 +34,14 @@ def parse_args() -> argparse.Namespace:
         help="The domain to substitute for ${DOMAIN}.",
     )
     parser.add_argument(
+        "--client-id",
+        metavar="CLIENT_ID",
+        help="Client id (e.g. 'contsec') used to name the default output file instead of the domain.",
+    )
+    parser.add_argument(
         "--output",
         metavar="OUTPUT_ZIP",
-        help="Path for the output ZIP file (default: coreiq-teams-<domain>.zip in the current directory).",
+        help="Path for the output ZIP file (default: coreiq-teams-<client-id or domain>.zip in frontend/teams-app/manifest/).",
     )
     return parser.parse_args()
 
@@ -47,8 +53,9 @@ def main() -> None:
     # Strip protocol prefix so both "https://example.com" and "example.com" work
     domain: str = args.domain.removeprefix("https://").removeprefix("http://").rstrip("/")
 
+    output_name = args.client_id if args.client_id else domain
     output_path = pathlib.Path(
-        args.output if args.output else f"coreiq-teams-{domain}.zip"
+        args.output if args.output else MANIFEST_DIR / f"coreiq-teams-{output_name}.zip"
     )
 
     manifest_template = MANIFEST_DIR / "manifest.json"
