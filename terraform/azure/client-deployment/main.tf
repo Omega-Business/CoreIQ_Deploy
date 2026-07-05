@@ -247,6 +247,38 @@ resource "azurerm_container_app" "app" {
           secret_name = "microsoft-app-password"
         }
       }
+
+      # HTTP probes against /healthz (nginx proxies this to the real
+      # backend, see frontend/nginx.conf) — without these, Azure Container
+      # Apps defaults to a bare TCP check on port 80, which only proves
+      # nginx is up and never detects a crashed backend process behind it.
+      # Thresholds/intervals mirror Azure's own TCP-probe defaults exactly,
+      # only the transport/path changed.
+      liveness_probe {
+        transport               = "HTTP"
+        port                    = 80
+        path                    = "/healthz"
+        interval_seconds        = 10
+        timeout                 = 5
+        failure_count_threshold = 3
+      }
+      readiness_probe {
+        transport                = "HTTP"
+        port                     = 80
+        path                     = "/healthz"
+        interval_seconds         = 5
+        timeout                  = 5
+        success_count_threshold  = 1
+        failure_count_threshold  = 48
+      }
+      startup_probe {
+        transport               = "HTTP"
+        port                    = 80
+        path                    = "/healthz"
+        interval_seconds        = 1
+        timeout                 = 3
+        failure_count_threshold = 240
+      }
     }
     min_replicas = 1
     max_replicas = 3
