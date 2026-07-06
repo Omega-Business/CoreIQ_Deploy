@@ -11,11 +11,14 @@
 # Required flags (or answered interactively):
 #   --client-id           SLUG    CoreIQ client identifier (e.g. "acme")
 #   --ghcr-token          TOKEN   GitHub PAT with read:packages scope
-#   --backend-api-key     KEY     CoreIQ backend API key (ciq_<client>_...)
+#   --restart-push-key    KEY     Shared secret from CoreIQ (matches backend's RESTART_PUSH_KEY)
 #   --qdrant-url          URL     Qdrant cluster URL (provided by CoreIQ)
 #   --qdrant-api-key      KEY     Qdrant JWT API key (provided by CoreIQ)
 #
 # Optional flags:
+#   --backend-api-key     KEY     Leave unset — CoreIQ pushes the real per-client
+#                                 key to your Key Vault after deployment. Only
+#                                 pass this if CoreIQ explicitly told you to.
 #   --location            REGION  Azure region (default: eastus)
 #   --foundry-model       NAME    AI Foundry model (default: gpt-5.4-nano)
 #   --foundry-model-ver   VER     Model version (default: 2026-03-17)
@@ -40,6 +43,7 @@ CLIENT_ID=""
 LOCATION="eastus"
 GHCR_TOKEN=""
 BACKEND_API_KEY=""
+RESTART_PUSH_KEY=""
 QDRANT_URL=""
 QDRANT_API_KEY=""
 FOUNDRY_MODEL="gpt-5.4-nano"
@@ -67,6 +71,7 @@ while [[ $# -gt 0 ]]; do
     --location)           LOCATION="$2";              shift 2 ;;
     --ghcr-token)         GHCR_TOKEN="$2";            shift 2 ;;
     --backend-api-key)    BACKEND_API_KEY="$2";       shift 2 ;;
+    --restart-push-key)   RESTART_PUSH_KEY="$2";      shift 2 ;;
     --qdrant-url)         QDRANT_URL="$2";            shift 2 ;;
     --qdrant-api-key)     QDRANT_API_KEY="$2";        shift 2 ;;
     --foundry-model)      FOUNDRY_MODEL="$2";         shift 2 ;;
@@ -123,9 +128,15 @@ echo ""
 CLIENT_ID=$(prompt_required      "client_id"       "Client ID (e.g. acme)"                  "$CLIENT_ID")
 LOCATION=$(prompt_optional                         "Azure region"                            "$LOCATION")
 GHCR_TOKEN=$(prompt_required     "ghcr_token"      "GitHub PAT (read:packages scope)"       "$GHCR_TOKEN" true)
-BACKEND_API_KEY=$(prompt_required "backend_api_key" "CoreIQ backend API key (ciq_...)"      "$BACKEND_API_KEY" true)
+RESTART_PUSH_KEY=$(prompt_required "restart_push_key" "Restart push key (shared secret from CoreIQ)" "$RESTART_PUSH_KEY" true)
 QDRANT_URL=$(prompt_required     "qdrant_url"      "Qdrant cluster URL"                     "$QDRANT_URL")
 QDRANT_API_KEY=$(prompt_required "qdrant_api_key"  "Qdrant API key"                         "$QDRANT_API_KEY" true)
+
+# backend_api_key is intentionally NOT prompted for — CoreIQ pushes the real
+# per-client key directly to this client's Key Vault after `terraform apply`
+# (see terraform.tfvars.example / client_deploy_checklist.md). Baking a value
+# in here up front is how a stale/wrong key ends up deployed; only set
+# BACKEND_API_KEY via --backend-api-key if CoreIQ explicitly told you to.
 
 if [[ ! "$CLIENT_ID" =~ ^[a-z0-9_-]+$ ]]; then
   die "client_id '${CLIENT_ID}' is invalid — use lowercase letters, numbers, hyphens, and underscores only."
@@ -401,9 +412,10 @@ session_secret        = "${SESSION_SECRET}"
 # SECTION 2: PROVIDED_BY_COREIQ — Do Not Change
 # ============================================================================
 
-backend_api_key = "${BACKEND_API_KEY}"
-do_backend_url  = "https://coreiq.omegabusiness.us/backend"
-ghcr_image      = "ghcr.io/omega-business/coreiq-client-stable:latest"
+backend_api_key  = "${BACKEND_API_KEY}"
+restart_push_key = "${RESTART_PUSH_KEY}"
+do_backend_url   = "https://coreiq.omegabusiness.us/backend"
+ghcr_image       = "ghcr.io/omega-business/coreiq-client-stable:latest"
 
 qdrant_url     = "${QDRANT_URL}"
 qdrant_api_key = "${QDRANT_API_KEY}"
